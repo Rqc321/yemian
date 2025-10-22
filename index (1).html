@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TextPad - 简洁在线文本编辑器</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass-effect {
+                @apply bg-white bg-opacity-20 backdrop-filter backdrop-blur-lg rounded-lg border border-white border-opacity-20 shadow-glass;
+            }
+            .btn {
+                @apply px-4 py-2 rounded-md transition-all duration-200 flex items-center justify-center gap-2 font-medium;
+            }
+            .btn-primary {
+                @apply bg-primary text-white hover:bg-primary/90 active:bg-primary/80;
+            }
+            .btn-secondary {
+                @apply bg-secondary text-white hover:bg-secondary/90 active:bg-secondary/80;
+            }
+            .btn-outline {
+                @apply border border-gray-300 text-gray-700 hover:bg-gray-100 active:bg-gray-200;
+            }
+            .btn-sm {
+                @apply px-3 py-1 text-sm;
+            }
+            .tooltip {
+                @apply invisible absolute z-10 py-1 px-2 bg-dark text-white text-xs rounded whitespace-nowrap opacity-0 transition-opacity duration-300;
+            }
+            .has-tooltip:hover .tooltip {
+                @apply visible opacity-100;
+            }
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* 编辑器样式 */
+        #editor {
+            resize: none;
+            tab-size: 4;
+            line-height: 1.6;
+        }
+        
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .slide-up {
+            animation: slideUp 0.4s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="text-primary text-2xl">
+                    <i class="fa fa-file-text-o" aria-hidden="true"></i>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">TextPad</h1>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- 主题切换按钮 -->
+                <button id="theme-toggle" class="btn btn-sm btn-outline rounded-full w-9 h-9 p-0">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>
+                </button>
+                
+                <!-- 分享按钮 -->
+                <div class="relative has-tooltip">
+                    <button id="share-btn" class="btn btn-sm btn-outline rounded-full w-9 h-9 p-0">
+                        <i class="fa fa-share-alt" aria-hidden="true"></i>
+                    </button>
+                    <span class="tooltip -mt-12 left-1/2 transform -translate-x-1/2">分享文档</span>
+                </div>
+                
+                <!-- 字数统计 -->
+                <div class="relative has-tooltip">
+                    <button id="word-count-btn" class="btn btn-sm btn-outline rounded-full w-9 h-9 p-0">
+                        <i class="fa fa-bar-chart" aria-hidden="true"></i>
+                    </button>
+                    <span class="tooltip -mt-12 left-1/2 transform -translate-x-1/2">字数统计</span>
+                </div>
+                
+                <!-- 操作菜单 -->
+                <div class="relative group">
+                    <button id="menu-btn" class="btn btn-sm btn-outline rounded-full w-9 h-9 p-0">
+                        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                    </button>
+                    <div id="menu-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
+                        <button id="new-doc-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <i class="fa fa-file-o mr-2" aria-hidden="true"></i>新建文档
+                        </button>
+                        <button id="save-doc-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <i class="fa fa-save mr-2" aria-hidden="true"></i>保存文档
+                        </button>
+                        <button id="download-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <i class="fa fa-download mr-2" aria-hidden="true"></i>下载文档
+                        </button>
+                        <hr class="my-1 border-gray-200">
+                        <button id="font-settings-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <i class="fa fa-font mr-2" aria-hidden="true"></i>字体设置
+                        </button>
+                        <button id="editor-settings-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <i class="fa fa-cog mr-2" aria-hidden="true"></i>编辑器设置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 container mx-auto px-4 py-6 flex flex-col">
+        <!-- 文档信息栏 -->
+        <div id="doc-info" class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span id="doc-id-display" class="text-sm text-gray-500">文档ID: <span class="font-mono">loading...</span></span>
+                <span id="save-status" class="text-sm text-gray-500">
+                    <i class="fa fa-circle-o-notch fa-spin" aria-hidden="true"></i> 加载中...
+                </span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <div class="relative has-tooltip">
+                    <button id="copy-link-btn" class="btn btn-sm btn-primary">
+                        <i class="fa fa-link" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">复制链接</span>
+                    </button>
+                    <span class="tooltip -mt-12 left-1/2 transform -translate-x-1/2">复制文档链接</span>
+                </div>
+                
+                <div class="relative has-tooltip">
+                    <button id="fullscreen-btn" class="btn btn-sm btn-outline">
+                        <i class="fa fa-expand" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">全屏编辑</span>
+                    </button>
+                    <span class="tooltip -mt-12 left-1/2 transform -translate-x-1/2">全屏编辑模式</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 编辑器区域 -->
+        <div class="relative flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <textarea
+                id="editor"
+                class="w-full h-full p-6 font-sans text-lg focus:outline-none"
+                placeholder="在此输入文本... 无需登录，所有更改会自动保存。"
+            ></textarea>
+            
+            <!-- 编辑器提示 -->
+            <div id="editor-hint" class="absolute bottom-4 right-4 text-xs text-gray-400">
+                <i class="fa fa-info-circle" aria-hidden="true"></i> 自动保存中...
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部状态栏 -->
+    <footer class="bg-white border-t border-gray-200 py-3">
+        <div class="container mx-auto px-4 flex items-center justify-between text-sm text-gray-500">
+            <div>
+                <span id="char-count">0</span> 字符 | 
+                <span id="word-count">0</span> 单词 | 
+                <span id="line-count">0</span> 行
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button id="help-btn" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fa fa-question-circle" aria-hidden="true"></i> 帮助
+                </button>
+                
+                <span>TextPad - 简洁在线文本编辑器</span>
+            </div>
+            
+            <div>
+                <span id="last-saved">从未保存</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 模态框 - 分享链接 -->
+    <div id="share-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 animate-slide-up">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">分享文档</h3>
+                    <button class="close-modal text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-4">复制以下链接分享给他人，所有人都可以查看和编辑此文档：</p>
+                
+                <div class="flex gap-2 mb-4">
+                    <input
+                        type="text"
+                        id="share-link"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        readonly
+                    >
+                    <button id="copy-share-link-btn" class="btn btn-primary whitespace-nowrap">
+                        <i class="fa fa-copy" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">复制</span>
+                    </button>
+                </div>
+                
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fa fa-exclamation-triangle text-yellow-400" aria-hidden="true"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                注意：此文档可被任何拥有链接的人编辑。请谨慎分享。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 px-6 py-3 flex justify-end rounded-b-lg">
+                <button class="close-modal btn btn-outline">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 字数统计 -->
+    <div id="word-count-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 animate-slide-up">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">字数统计</h3>
+                    <button class="close-modal text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">字符数 (含空格)</span>
+                        <span id="stat-char-count" class="font-mono text-lg font-semibold">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">字符数 (不含空格)</span>
+                        <span id="stat-char-count-no-space" class="font-mono text-lg font-semibold">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">单词数</span>
+                        <span id="stat-word-count" class="font-mono text-lg font-semibold">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">行数</span>
+                        <span id="stat-line-count" class="font-mono text-lg font-semibold">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">段落数</span>
+                        <span id="stat-paragraph-count" class="font-mono text-lg font-semibold">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-600">估计阅读时间</span>
+                        <span id="stat-reading-time" class="font-mono text-lg font-semibold">0 分钟</span>
+                    </div>
+                    
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">存储使用</span>
+                            <span id="stat-storage-usage" class="font-mono">0 KB / 7,000 KB</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                            <div id="storage-progress" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 px-6 py-3 flex justify-end rounded-b-lg">
+                <button class="close-modal btn btn-outline">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 字体设置 -->
+    <div id="font-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 animate-slide-up">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">字体设置</h3>
+                    <button class="close-modal text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">字体类型</label>
+                        <select id="font-family-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                            <option value="sans-serif">无衬线字体 (默认)</option>
+                            <option value="serif">衬线字体</option>
+                            <option value="monospace">等宽字体</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">字体大小: <span id="font-size-value">18</span>px</label>
+                        <input
+                            type="range"
+                            id="font-size-slider"
+                            min="12"
+                            max="36"
+                            value="18"
+                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">行高: <span id="line-height-value">1.6</span></label>
+                        <input
+                            type="range"
+                            id="line-height-slider"
+                            min="1"
+                            max="3"
+                            step="0.1"
+                            value="1.6"
+                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        >
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-200">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">预览</label>
+                        <div id="font-preview" class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <p>这是一段预览文本，用于展示字体设置的效果。</p>
+                            <p class="mt-2">The quick brown fox jumps over the lazy dog.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-lg">
+                <button id="reset-font-settings" class="btn btn-outline">恢复默认</button>
+                <button id="apply-font-settings" class="btn btn-primary">应用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 编辑器设置 -->
+    <div id="editor-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 animate-slide-up">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">编辑器设置</h3>
+                    <button class="close-modal text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-800">自动保存</h4>
+                            <p class="text-sm text-gray-500">实时保存编辑器内容</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="auto-save-toggle"
+                                class="sr-only peer"
+                                checked
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-800">拼写检查</h4>
+                            <p class="text-sm text-gray-500">检查文本中的拼写错误</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="spell-check-toggle"
+                                class="sr-only peer"
+                                checked
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-800">自动换行</h4>
+                            <p class="text-sm text-gray-500">文本超出编辑器宽度时自动换行</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="word-wrap-toggle"
+                                class="sr-only peer"
+                                checked
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-800">显示行号</h4>
+                            <p class="text-sm text-gray-500">在编辑器左侧显示行号</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="line-numbers-toggle"
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-200">
+                        <h4 class="font-medium text-gray-800 mb-2">主题</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button class="theme-btn p-2 border-2 border-primary rounded-md" data-theme="light">
+                                <div class="w-full h-12 bg-white border border-gray-200 rounded"></div>
+                                <p class="text-xs text-center mt-1">浅色</p>
+                            </button>
+                            <button class="theme-btn p-2 border-2 border-transparent rounded-md" data-theme="dark">
+                                <div class="w-full h-12 bg-gray-900 border border-gray-700 rounded"></div>
+                                <p class="text-xs text-center mt-1">深色</p>
+                            </button>
+                            <button class="theme-btn p-2 border-2 border-transparent rounded-md" data-theme="system">
+                                <div class="w-full h-12 bg-gradient-to-r from-white to-gray-900 border border-gray-200 rounded"></div>
+                                <p class="text-xs text-center mt-1">跟随系统</p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 px-6 py-3 flex justify-end gap-3 rounded-b-lg">
+                <button id="reset-editor-settings" class="btn btn-outline">恢复默认</button>
+                <button id="apply-editor-settings" class="btn btn-primary">应用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 帮助 -->
+    <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 animate-slide-up max-h-[80vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800">使用帮助</h3>
+                    <button class="close-modal text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-medium text-gray-800 text-lg">基本操作</h4>
+                        <ul class="list-disc pl-5 mt-2 text-gray-600 space-y-1">
+                            <li>直接在编辑器中输入或粘贴文本</li>
+                            <li>所有更改会自动保存，无需手动保存</li>
+                            <li>点击"复制链接"按钮分享文档给他人</li>
+                            <li>使用顶部菜单可以创建新文档、下载文档等</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-800 text-lg">功能特点</h4>
+                        <ul class="list-disc pl-5 mt-2 text-gray-600 space-y-1">
+                            <li>无需注册登录，直接使用</li>
+                            <li>支持700万字的超大文本存储</li>
+                            <li>多人可同时编辑同一文档</li>
+                            <li>自动保存，防止意外关闭丢失内容</li>
+                            <li>可自定义字体、字号、行高等样式</li>
+                            <li>支持浅色/深色主题切换</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-800 text-lg">快捷键</h4>
+                        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl + S</span>
+                                <span class="ml-2 text-gray-600">手动保存</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl + N</span>
+                                <span class="ml-2 text-gray-600">新建文档</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl + L</span>
+                                <span class="ml-2 text-gray-600">复制链接</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">F11</span>
+                                <span class="ml-2 text-gray-600">全屏编辑</span>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl + /</span>
+                                <span class="ml-2 text-gray-600">显示/隐藏帮助</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-800 text-lg">注意事项</h4>
+                        <ul class="list-disc pl-5 mt-2 text-gray-600 space-y-1">
+                            <li>文档链接可被任何人访问和编辑，请谨慎分享</li>
+                            <li>建议定期导出重要文档备份</li>
+                            <li>超大文本可能会影响编辑性能</li>
+                            <li>清除浏览器数据可能会导致本地存储的文档丢失</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 px-6 py-3 flex justify-end rounded-b-lg">
+                <button class="close-modal btn btn-outline">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-sm transform translate-y-10 opacity-0 transition-all duration-300 flex items-center gap-3 z-50">
+        <div id="notification-icon" class="text-primary text-xl">
+            <i class="fa fa-info-circle" aria-hidden="true"></i>
+        </div>
+        <div>
+            <h4 id="notification-title" class="font-medium text-gray-800">通知标题</h4>
+            <p id="notification-message" class="text-sm text-gray-600">通知内容</p>
+        </div>
+        <button id="close-notification" class="text-gray-400 hover:text-gray-600 ml-auto">
+            <i class="fa fa-times" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 全局变量
+        const MAX_SIZE_BYTES = 7 * 1024 * 1024; // 7MB
+        let currentDocId = null;
+        let editorContent = '';
+        let saveTimeout = null;
+        let isSaving = false;
+        let lastSavedTime = null;
+        let userSettings = {
+            theme: 'light',
+            fontFamily: 'sans-serif',
+            fontSize: 18,
+            lineHeight: 1.6,
+            autoSave: true,
+            spellCheck: true,
+            wordWrap: true,
+            lineNumbers: false
+        };
+        
+        // DOM 元素
+        const editor = document.getElementById('editor');
+        const docIdDisplay = document.getElementById('doc-id-display').querySelector('span');
+        const saveStatus = document.getElementById('save-status');
+        const charCountElement = document.getElementById('char-count');
+        const wordCountElement = document.getElementById('word-count');
+        const lineCountElement = document.getElementById('line-count');
+        const lastSavedElement = document.getElementById('last-saved');
+        const shareLinkElement = document.getElementById('share-link');
+        const notification = document.getElementById('notification');
+        const notificationTitle = document.getElementById('notification-title');
+        const notificationMessage = document.getElementById('notification-message');
+        const notificationIcon = document.getElementById('notification-icon');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initEditor();
+            setupEventListeners();
+            loadUserSettings();
+            applyUserSettings();
+        });
+        
+        // 初始化编辑器
+        function initEditor() {
+            // 从 URL 获取文档 ID
+            const urlParams = new URLSearchParams(window.location.search);
+            currentDocId = urlParams.get('id');
+            
+            if (currentDocId) {
+                // 加载现有文档
+                loadDocument(currentDocId);
+                docIdDisplay.textContent = currentDocId;
+                updateShareLink();
+            } else {
+                // 创建新文档
+                createNewDocument();
+            }
+            
+            // 更新字数统计
+            updateWordCount();
+        }
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 编辑器内容变化
+            editor.addEventListener('input', debounce(() => {
+                editorContent = editor.value;
+                updateWordCount();
+                
+                if (userSettings.autoSave) {
+                    saveDocument();
+                }
+            }, 500));
+            
+            // 新建文档按钮
+            document.getElementById('new-doc-btn').addEventListener('click', createNewDocument);
+            
+            // 保存文档按钮
+            document.getElementById('save-doc-btn').addEventListener('click', saveDocument);
+            
+            // 下载文档按钮
+            document.getElementById('download-btn').addEventListener('click', downloadDocument);
+            
+            // 复制链接按钮
+            document.getElementById('copy-link-btn').addEventListener('click', copyShareLink);
+            document.getElementById('copy-share-link-btn').addEventListener('click', copyShareLink);
+            
+            // 分享按钮
+            document.getElementById('share-btn').addEventListener('click', () => {
+                document.getElementById('share-modal').classList.remove('hidden');
+            });
+            
+            // 字数统计按钮
+            document.getElementById('word-count-btn').addEventListener('click', () => {
+                updateWordCountStats();
+                document.getElementById('word-count-modal').classList.remove('hidden');
+            });
+            
+            // 字体设置按钮
+            document.getElementById('font-settings-btn').addEventListener('click', () => {
+                document.getElementById('font-settings-modal').classList.remove('hidden');
+                updateFontPreview();
+            });
+            
+            // 编辑器设置按钮
+            document.getElementById('editor-settings-btn').addEventListener('click', () => {
+                document.getElementById('editor-settings-modal').classList.remove('hidden');
+            });
+            
+            // 帮助按钮
+            document.getElementById('help-btn').addEventListener('click', () => {
+                document.getElementById('help-modal').classList.remove('hidden');
+            });
+            
+            // 全屏按钮
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+            
+            // 主题切换按钮
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+            
+            // 关闭通知按钮
+            document.getElementById('close-notification').addEventListener('click', hideNotification);
+            
+            // 关闭模态框按钮
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.fixed.inset-0').forEach(modal => {
+                        modal.classList.add('hidden');
+                    });
+                });
+            });
+            
+            // 字体设置应用按钮
+            document.getElementById('apply-font-settings').addEventListener('click', () => {
+                applyFontSettings();
+                document.getElementById('font-settings-modal').classList.add('hidden');
+            });
+            
+            // 字体设置重置按钮
+            document.getElementById('reset-font-settings').addEventListener('click', resetFontSettings);
+            
+            // 编辑器设置应用按钮
+            document.getElementById('apply-editor-settings').addEventListener('click', () => {
+                applyEditorSettings();
+                document.getElementById('editor-settings-modal').classList.add('hidden');
+            });
+            
+            // 编辑器设置重置按钮
+            document.getElementById('reset-editor-settings').addEventListener('click', resetEditorSettings);
+            
+            // 字体大小滑块
+            const fontSizeSlider = document.getElementById('font-size-slider');
+            const fontSizeValue = document.getElementById('font-size-value');
+            fontSizeSlider.addEventListener('input', () => {
+                fontSizeValue.textContent = fontSizeSlider.value;
+                updateFontPreview();
+            });
+            
+            // 行高滑块
+            const lineHeightSlider = document.getElementById('line-height-slider');
+            const lineHeightValue = document.getElementById('line-height-value');
+            lineHeightSlider.addEventListener('input', () => {
+                lineHeightValue.textContent = lineHeightSlider.value;
+                updateFontPreview();
+            });
+            
+            // 字体类型选择
+            document.getElementById('font-family-select').addEventListener('change', updateFontPreview);
+            
+            // 主题按钮
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.theme-btn').forEach(b => {
+                        b.classList.remove('border-primary');
+                        b.classList.add('border-transparent');
+                    });
+                    btn.classList.remove('border-transparent');
+                    btn.classList.add('border-primary');
+                });
+            });
+            
+            // 快捷键
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+            
+            // 窗口关闭前提示
+            window.addEventListener('beforeunload', (e) => {
+                if (editorContent && !isSaving && lastSavedTime && new Date() - lastSavedTime > 1000) {
+                    e.preventDefault();
+                    e.returnValue = '您的更改可能尚未保存，确定要离开吗？';
+                    return e.returnValue;
+                }
+            });
+        }
+        
+        // 处理键盘快捷键
+        function handleKeyboardShortcuts(e) {
+            // Ctrl+S 保存
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveDocument();
+            }
+            
+            // Ctrl+N 新建文档
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                createNewDocument();
+            }
+            
+            // Ctrl+L 复制链接
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                copyShareLink();
+            }
+            
+            // Ctrl+/ 显示/隐藏帮助
+            if (e.ctrlKey && e.key === '/') {
+                e.preventDefault();
+                const helpModal = document.getElementById('help-modal');
+                if (helpModal.classList.contains('hidden')) {
+                    helpModal.classList.remove('hidden');
+                } else {
+                    helpModal.classList.add('hidden');
+                }
+            }
+        }
+        
+        // 创建新文档
+        function createNewDocument() {
+            // 生成随机文档 ID
+            currentDocId = generateRandomId();
+            docIdDisplay.textContent = currentDocId;
+            
+            // 清空编辑器
+            editor.value = '';
+            editorContent = '';
+            
+            // 更新 URL
+            const url = new URL(window.location.href);
+            url.searchParams.set('id', currentDocId);
+            window.history.pushState({}, '', url);
+            
+            // 更新分享链接
+            updateShareLink();
+            
+            // 更新字数统计
+            updateWordCount();
+            
+            // 显示通知
+            showNotification('成功', '已创建新文档', 'success');
+        }
+        
+        // 加载文档
+        function loadDocument(docId) {
+            try {
+                // 模拟加载延迟
+                setTimeout(() => {
+                    // 在实际应用中，这里会从服务器加载文档
+                    // 这里我们使用 localStorage 模拟
+                    const savedContent = localStorage.getItem(`textpad_${docId}`) || '';
+                    editor.value = savedContent;
+                    editorContent = savedContent;
+                    
+                    saveStatus.innerHTML = '<i class="fa fa-check text-success" aria-hidden="true"></i> 已加载';
+                    lastSavedElement.textContent = '刚刚';
+                    lastSavedTime = new Date();
+                    
+                    showNotification('成功', '文档已加载', 'success');
+                }, 500);
+            } catch (error) {
+                saveStatus.innerHTML = '<i class="fa fa-exclamation-circle text-danger" aria-hidden="true"></i> 加载失败';
+                showNotification('错误', '加载文档失败', 'error');
+                console.error('Error loading document:', error);
+            }
+        }
+        
+        // 保存文档
+        function saveDocument() {
+            if (isSaving) return;
+            
+            isSaving = true;
+            saveStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin" aria-hidden="true"></i> 保存中...';
+            
+            try {
+                // 检查大小限制
+                const contentSize = new Blob([editorContent]).size;
+                if (contentSize > MAX_SIZE_BYTES) {
+                    saveStatus.innerHTML = '<i class="fa fa-exclamation-circle text-danger" aria-hidden="true"></i> 超出大小限制';
+                    showNotification('错误', '文档大小超出限制 (7MB)', 'error');
+                    isSaving = false;
+                    return;
+                }
+                
+                // 模拟保存延迟
+                setTimeout(() => {
+                    try {
+                        // 在实际应用中，这里会将文档保存到服务器
+                        // 这里我们使用 localStorage 模拟
+                        localStorage.setItem(`textpad_${currentDocId}`, editorContent);
+                        
+                        saveStatus.innerHTML = '<i class="fa fa-check text-success" aria-hidden="true"></i> 已保存';
+                        lastSavedTime = new Date();
+                        lastSavedElement.textContent = '刚刚';
+                        
+                        showNotification('成功', '文档已保存', 'success');
+                    } catch (error) {
+                        saveStatus.innerHTML = '<i class="fa fa-exclamation-circle text-danger" aria-hidden="true"></i> 保存失败';
+                        showNotification('错误', '保存文档失败', 'error');
+                        console.error('Error saving document:', error);
+                    } finally {
+                        isSaving = false;
+                    }
+                }, 300);
+            } catch (error) {
+                saveStatus.innerHTML = '<i class="fa fa-exclamation-circle text-danger" aria-hidden="true"></i> 保存失败';
+                showNotification('错误', '保存文档失败', 'error');
+                console.error('Error saving document:', error);
+                isSaving = false;
+            }
+        }
+        
+        // 下载文档
+        function downloadDocument() {
+            const content = editor.value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `textpad-document-${currentDocId}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+            
+            showNotification('成功', '文档已下载', 'success');
+        }
+        
+        // 更新分享链接
+        function updateShareLink() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('id', currentDocId);
+            shareLinkElement.value = url.toString();
+        }
+        
+        // 复制分享链接
+        function copyShareLink() {
+            shareLinkElement.select();
+            document.execCommand('copy');
+            
+            showNotification('成功', '链接已复制到剪贴板', 'success');
+            
+            // 关闭分享模态框
+            document.getElementById('share-modal').classList.add('hidden');
+        }
+        
+        // 更新字数统计
+        function updateWordCount() {
+            const content = editor.value;
+            
+            // 字符数
+            const charCount = content.length;
+            charCountElement.textContent = charCount.toLocaleString();
+            
+            // 单词数
+            const wordCount = content.trim() === '' ? 0 : content.trim().split(/\s+/).length;
+            wordCountElement.textContent = wordCount.toLocaleString();
+            
+            // 行数
+            const lineCount = content.split('\n').length;
+            lineCountElement.textContent = lineCount.toLocaleString();
+            
+            // 更新存储使用
+            updateStorageUsage();
+        }
+        
+        // 更新字数统计详情
+        function updateWordCountStats() {
+            const content = editor.value;
+            
+            // 字符数 (含空格)
+            document.getElementById('stat-char-count').textContent = content.length.toLocaleString();
+            
+            // 字符数 (不含空格)
+            const charCountNoSpace = content.replace(/\s+/g, '').length;
+            document.getElementById('stat-char-count-no-space').textContent = charCountNoSpace.toLocaleString();
+            
+            // 单词数
+            const wordCount = content.trim() === '' ? 0 : content.trim().split(/\s+/).length;
+            document.getElementById('stat-word-count').textContent = wordCount.toLocaleString();
+            
+            // 行数
+            const lineCount = content.split('\n').length;
+            document.getElementById('stat-line-count').textContent = lineCount.toLocaleString();
+            
+            // 段落数
+            const paragraphCount = content.split(/\n+/).filter(p => p.trim() !== '').length;
+            document.getElementById('stat-paragraph-count').textContent = paragraphCount.toLocaleString();
+            
+            // 估计阅读时间 (假设每分钟阅读200个单词)
+            const readingTime = Math.ceil(wordCount / 200);
+            document.getElementById('stat-reading-time').textContent = `${readingTime} 分钟`;
+            
+            // 更新存储使用
+            updateStorageUsage();
+        }
+        
+        // 更新存储使用
+        function updateStorageUsage() {
+            const contentSize = new Blob([editor.value]).size;
+            const usageKB = Math.ceil(contentSize / 1024);
+            const maxKB = Math.ceil(MAX_SIZE_BYTES / 1024);
+            const usagePercent = Math.min(100, Math.round((contentSize / MAX_SIZE_BYTES) * 100));
+            
+            document.getElementById('stat-storage-usage').textContent = `${usageKB} KB / ${maxKB} KB`;
+            document.getElementById('storage-progress').style.width = `${usagePercent}%`;
+            
+            // 如果使用超过90%，显示警告
+            if (usagePercent > 90) {
+                document.getElementById('storage-progress').classList.remove('bg-primary');
+                document.getElementById('storage-progress').classList.add('bg-warning');
+            } else {
+                document.getElementById('storage-progress').classList.remove('bg-warning');
+                document.getElementById('storage-progress').classList.add('bg-primary');
+            }
+        }
+        
+        // 切换全屏
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    showNotification('错误', `全屏模式错误: ${err.message}`, 'error');
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        // 切换主题
+        function toggleTheme() {
+            const newTheme = userSettings.theme === 'light' ? 'dark' : 'light';
+            userSettings.theme = newTheme;
+            applyTheme();
+            saveUserSettings();
+            
+            showNotification('成功', `已切换到${newTheme === 'light' ? '浅色' : '深色'}主题`, 'success');
+        }
+        
+        // 应用主题
+        function applyTheme() {
+            const body = document.body;
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            if (userSettings.theme === 'dark') {
+                body.classList.add('dark');
+                body.classList.remove('bg-gray-50');
+                body.classList.add('bg-gray-900');
+                body.classList.remove('text-gray-900');
+                body.classList.add('text-gray-100');
+                
+                // 更新编辑器样式
+                editor.classList.remove('bg-white', 'text-gray-900');
+                editor.classList.add('bg-gray-800', 'text-gray-100');
+                
+                // 更新主题切换按钮
+                themeToggle.innerHTML = '<i class="fa fa-sun-o" aria-hidden="true"></i>';
+            } else {
+                body.classList.remove('dark');
+                body.classList.add('bg-gray-50');
+                body.classList.remove('bg-gray-900');
+                body.classList.add('text-gray-900');
+                body.classList.remove('text-gray-100');
+                
+                // 更新编辑器样式
+                editor.classList.add('bg-white', 'text-gray-900');
+                editor.classList.remove('bg-gray-800', 'text-gray-100');
+                
+                // 更新主题切换按钮
+                themeToggle.innerHTML = '<i class="fa fa-moon-o" aria-hidden="true"></i>';
+            }
+        }
+        
+        // 更新字体预览
+        function updateFontPreview() {
+            const fontFamily = document.getElementById('font-family-select').value;
+            const fontSize = document.getElementById('font-size-slider').value + 'px';
+            const lineHeight = document.getElementById('line-height-slider').value;
+            
+            const preview = document.getElementById('font-preview');
+            preview.style.fontFamily = getFontFamilyValue(fontFamily);
+            preview.style.fontSize = fontSize;
+            preview.style.lineHeight = lineHeight;
+        }
+        
+        // 应用字体设置
+        function applyFontSettings() {
+            const fontFamily = document.getElementById('font-family-select').value;
+            const fontSize = parseInt(document.getElementById('font-size-slider').value);
+            const lineHeight = parseFloat(document.getElementById('line-height-slider').value);
+            
+            userSettings.fontFamily = fontFamily;
+            userSettings.fontSize = fontSize;
+            userSettings.lineHeight = lineHeight;
+            
+            // 应用到编辑器
+            editor.style.fontFamily = getFontFamilyValue(fontFamily);
+            editor.style.fontSize = fontSize + 'px';
+            editor.style.lineHeight = lineHeight;
+            
+            // 保存设置
+            saveUserSettings();
+            
+            showNotification('成功', '字体设置已应用', 'success');
+        }
+        
+        // 重置字体设置
+        function resetFontSettings() {
+            document.getElementById('font-family-select').value = 'sans-serif';
+            document.getElementById('font-size-slider').value = 18;
+            document.getElementById('font-size-value').textContent = '18';
+            document.getElementById('line-height-slider').value = 1.6;
+            document.getElementById('line-height-value').textContent = '1.6';
+            
+            updateFontPreview();
+        }
+        
+        // 应用编辑器设置
+        function applyEditorSettings() {
+            const autoSave = document.getElementById('auto-save-toggle').checked;
+            const spellCheck = document.getElementById('spell-check-toggle').checked;
+            const wordWrap = document.getElementById('word-wrap-toggle').checked;
+            const lineNumbers = document.getElementById('line-numbers-toggle').checked;
+            
+            // 获取选中的主题
+            const selectedThemeBtn = document.querySelector('.theme-btn.border-primary');
+            const theme = selectedThemeBtn ? selectedThemeBtn.dataset.theme : 'light';
+            
+            userSettings.autoSave = autoSave;
+            userSettings.spellCheck = spellCheck;
+            userSettings.wordWrap = wordWrap;
+            userSettings.lineNumbers = lineNumbers;
+            userSettings.theme = theme;
+            
+            // 应用到编辑器
+            editor.spellcheck = spellCheck;
+            editor.style.wordWrap = wordWrap ? 'break-word' : 'normal';
+            
+            // 应用主题
+            applyTheme();
+            
+            // 保存设置
+            saveUserSettings();
+            
+            showNotification('成功', '编辑器设置已应用', 'success');
+        }
+        
+        // 重置编辑器设置
+        function resetEditorSettings() {
+            document.getElementById('auto-save-toggle').checked = true;
+            document.getElementById('spell-check-toggle').checked = true;
+            document.getElementById('word-wrap-toggle').checked = true;
+            document.getElementById('line-numbers-toggle').checked = false;
+            
+            // 重置主题选择
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('border-primary');
+                btn.classList.add('border-transparent');
+                if (btn.dataset.theme === 'light') {
+                    btn.classList.remove('border-transparent');
+                    btn.classList.add('border-primary');
+                }
+            });
+        }
+        
+        // 加载用户设置
+        function loadUserSettings() {
+            try {
+                const savedSettings = localStorage.getItem('textpad_settings');
+                if (savedSettings) {
+                    userSettings = { ...userSettings, ...JSON.parse(savedSettings) };
+                }
+            } catch (error) {
+                console.error('Error loading user settings:', error);
+            }
+        }
+        
+        // 保存用户设置
+        function saveUserSettings() {
+            try {
+                localStorage.setItem('textpad_settings', JSON.stringify(userSettings));
+            } catch (error) {
+                console.error('Error saving user settings:', error);
+            }
+        }
+        
+        // 应用用户设置
+        function applyUserSettings() {
+            // 应用字体设置
+            editor.style.fontFamily = getFontFamilyValue(userSettings.fontFamily);
+            editor.style.fontSize = userSettings.fontSize + 'px';
+            editor.style.lineHeight = userSettings.lineHeight;
+            
+            // 应用编辑器设置
+            editor.spellcheck = userSettings.spellCheck;
+            editor.style.wordWrap = userSettings.wordWrap ? 'break-word' : 'normal';
+            
+            // 更新设置面板
+            document.getElementById('font-family-select').value = userSettings.fontFamily;
+            document.getElementById('font-size-slider').value = userSettings.fontSize;
+            document.getElementById('font-size-value').textContent = userSettings.fontSize;
+            document.getElementById('line-height-slider').value = userSettings.lineHeight;
+            document.getElementById('line-height-value').textContent = userSettings.lineHeight;
+            
+            document.getElementById('auto-save-toggle').checked = userSettings.autoSave;
+            document.getElementById('spell-check-toggle').checked = userSettings.spellCheck;
+            document.getElementById('word-wrap-toggle').checked = userSettings.wordWrap;
+            document.getElementById('line-numbers-toggle').checked = userSettings.lineNumbers;
+            
+            // 更新主题选择
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('border-primary');
+                btn.classList.add('border-transparent');
+                if (btn.dataset.theme === userSettings.theme) {
+                    btn.classList.remove('border-transparent');
+                    btn.classList.add('border-primary');
+                }
+            });
+            
+            // 应用主题
+            applyTheme();
+        }
+        
+        // 获取字体族值
+        function getFontFamilyValue(value) {
+            switch (value) {
+                case 'sans-serif':
+                    return 'Inter, system-ui, sans-serif';
+                case 'serif':
+                    return 'Georgia, serif';
+                case 'monospace':
+                    return 'Fira Code, monospace';
+                default:
+                    return value;
+            }
+        }
+        
+        // 显示通知
+        function showNotification(title, message, type = 'info') {
+            notificationTitle.textContent = title;
+            notificationMessage.textContent = message;
+            
+            // 设置图标
+            switch (type) {
+                case 'success':
+                    notificationIcon.innerHTML = '<i class="fa fa-check-circle" aria-hidden="true"></i>';
+                    notificationIcon.className = 'text-success text-xl';
+                    break;
+                case 'error':
+                    notificationIcon.innerHTML = '<i class="fa fa-exclamation-circle" aria-hidden="true"></i>';
+                    notificationIcon.className = 'text-danger text-xl';
+                    break;
+                case 'warning':
+                    notificationIcon.innerHTML = '<i class="fa fa-exclamation-triangle" aria-hidden="true"></i>';
+                    notificationIcon.className = 'text-warning text-xl';
+                    break;
+                default:
+                    notificationIcon.innerHTML = '<i class="fa fa-info-circle" aria-hidden="true"></i>';
+                    notificationIcon.className = 'text-primary text-xl';
+            }
+            
+            // 显示通知
+            notification.classList.remove('translate-y-10', 'opacity-0');
+            
+            // 自动隐藏
+            setTimeout(hideNotification, 3000);
+        }
+        
+        // 隐藏通知
+        function hideNotification() {
+            notification.classList.add('translate-y-10', 'opacity-0');
+        }
+        
+        // 生成随机 ID
+        function generateRandomId(length = 10) {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+        
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    func.apply(context, args);
+                }, wait);
+            };
+        }
+    </script>
+</body>
+</html>
